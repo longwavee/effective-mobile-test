@@ -35,12 +35,25 @@ func New() (*App, error) {
 }
 
 func (a *App) Start() error {
+	err := a.di.HTTPServer().Start()
+	if err != nil {
+		return fmt.Errorf("start http server failed: %w", err)
+	}
+	a.log.Info("http server started", "port", a.cfg.HTTPServer.Port)
+
 	a.log.Info("app started successfully")
 	return nil
 }
 
 func (a *App) GracefullStop() error {
 	a.log.Info("app start stopping gracefully...")
+
+	err := a.di.HTTPServer().Stop()
+	if err != nil {
+		return fmt.Errorf("stop http server failed: %w", err)
+	}
+	a.log.Info("http server gracefull stopped", "port", a.cfg.HTTPServer.Port)
+
 	a.log.Info("app gracefully stopped")
 	return nil
 }
