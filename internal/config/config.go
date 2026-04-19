@@ -32,6 +32,8 @@ type (
 		IdleTimeout       time.Duration `env:"HTTP_SERVER_IDLE_TIMEOUT" env-default:"60s"`
 		MaxHeaderBytes    int           `env:"HTTP_SERVER_MAX_HEADER_BYTES" env-default:"500"`
 		ShutdownTimeout   time.Duration `env:"HTTP_SERVER_SHUTDOWN_TIMEOUT" env-default:"1s"`
+
+		ReadinessTimeout time.Duration `env:"HTTP_SERVER_READINESS_TIMEOUT" env-default:"30s"`
 	}
 )
 
