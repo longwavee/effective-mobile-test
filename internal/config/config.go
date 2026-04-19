@@ -14,7 +14,12 @@ const (
 
 type (
 	Config struct {
-		Env string `env:"ENV" env-default:"prod"`
+		Env    string `env:"ENV" env-default:"prod"`
+		Logger Logger
+	}
+
+	Logger struct {
+		Level int `env:"LOGGER_LEVEL" env-default:"0"`
 	}
 )
 
