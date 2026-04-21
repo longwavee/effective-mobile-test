@@ -15,6 +15,8 @@ const (
 const (
 	PathLiveness  = "/liveness"
 	PathReadiness = "/readiness"
+
+	PathSubscriptions = "/subscriptions"
 )
 
 type (
@@ -22,10 +24,18 @@ type (
 		Live(w http.ResponseWriter, r *http.Request)
 		Ready(w http.ResponseWriter, r *http.Request)
 	}
+
+	SubscriptionHandler interface {
+		Create(w http.ResponseWriter, r *http.Request)
+		GetByID(w http.ResponseWriter, r *http.Request)
+		Update(w http.ResponseWriter, r *http.Request)
+		Delete(w http.ResponseWriter, r *http.Request)
+	}
 )
 
 func NewHTTPRouter(
 	healthHandler HealthHandler,
+	subsHandler SubscriptionHandler,
 
 	loggingMiddleware func(http.Handler) http.Handler,
 	recoveryMiddleware func(http.Handler) http.Handler,
@@ -42,6 +52,13 @@ func NewHTTPRouter(
 	r.Route(APIPathV1, func(r chi.Router) {
 		r.Get(PathLiveness, healthHandler.Live)
 		r.Get(PathReadiness, healthHandler.Ready)
+
+		r.Route(PathSubscriptions, func(r chi.Router) {
+			r.Post("/", subsHandler.Create)
+			r.Get("/{id}", subsHandler.GetByID)
+			r.Put("/{id}", subsHandler.Update)
+			r.Delete("/{id}", subsHandler.Delete)
+		})
 	})
 
 	return r

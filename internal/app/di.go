@@ -25,8 +25,10 @@ type (
 		httpRouter http.Handler
 
 		healthHandler *handlers.HealthHandler
+		subsHandler   *handlers.SubscriptionHandler
 
 		healthService *service.HealthService
+		subsService   *service.SubscriptionService
 
 		subscriptionRepo *repository.SubscriptionRepo
 	}
@@ -54,6 +56,7 @@ func (c *DIContainer) HTTPRouter() http.Handler {
 	if c.httpRouter == nil {
 		c.httpRouter = rest.NewHTTPRouter(
 			c.HealthHandler(),
+			c.SubscriptionHandler(),
 
 			middlewares.Logging(c.log),
 			middlewares.Recovery(c.log),
@@ -74,6 +77,17 @@ func (c *DIContainer) HealthHandler() *handlers.HealthHandler {
 	return c.healthHandler
 }
 
+func (c *DIContainer) SubscriptionHandler() *handlers.SubscriptionHandler {
+	if c.subsHandler == nil {
+		c.subsHandler = handlers.NewSubscriptionHandler(
+			c.SubscriptionService(),
+			c.log,
+		)
+		c.log.Debug("subscription handler initialized")
+	}
+	return c.subsHandler
+}
+
 func (c *DIContainer) HealthService() *service.HealthService {
 	if c.healthService == nil {
 		c.healthService = service.NewHealthService(
@@ -82,6 +96,16 @@ func (c *DIContainer) HealthService() *service.HealthService {
 		c.log.Debug("health service initialized")
 	}
 	return c.healthService
+}
+
+func (c *DIContainer) SubscriptionService() *service.SubscriptionService {
+	if c.subsService == nil {
+		c.subsService = service.NewSubscriptionService(
+			c.SubscriptionsRepo(),
+		)
+		c.log.Debug("subscription service initialized")
+	}
+	return c.subsService
 }
 
 func (c *DIContainer) SubscriptionsRepo() *repository.SubscriptionRepo {
