@@ -18,6 +18,7 @@ type (
 		Env        string `env:"ENV" env-default:"prod"`
 		Logger     Logger
 		HTTPServer HTTPServer
+		Postgres   Postgres
 	}
 
 	Logger struct {
@@ -35,6 +36,15 @@ type (
 
 		ReadinessTimeout time.Duration `env:"HTTP_SERVER_READINESS_TIMEOUT" env-default:"30s"`
 	}
+
+	Postgres struct {
+		Host     string `env:"POSTGRES_HOST" env-default:"postgres"`
+		Port     string `env:"POSTGRES_PORT" env-default:"5432"`
+		User     string `env:"POSTGRES_USER" env-required:"true"`
+		Password string `env:"POSTGRES_PASSWORD" env-required:"true"`
+		DBName   string `env:"POSTGRES_DB" env-required:"true"`
+		SSLMode  string `env:"POSTGRES_SSLMODE" env-default:"disable"`
+	}
 )
 
 func Load() (*Config, error) {
@@ -44,4 +54,16 @@ func Load() (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+func (p *Postgres) ConnString() string {
+	return fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		p.User,
+		p.Password,
+		p.Host,
+		p.Port,
+		p.DBName,
+		p.SSLMode,
+	)
 }

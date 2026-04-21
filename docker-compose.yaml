@@ -1,5 +1,35 @@
 services:
 
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+    restart: unless-stopped
+    container_name: subs_db
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  
+
+  migrator:
+    build: .
+    command: >
+      ./migrator 
+      -connection-str="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=${POSTGRES_SSLMODE}" 
+      -migrations-path="migrations"
+    container_name: subs_migrator
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+
   app:
     build:
       context: .
@@ -9,3 +39,8 @@ services:
       - "${HTTP_SERVER_PORT}:${HTTP_SERVER_PORT}"
     env_file:
       - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
