@@ -1,0 +1,252 @@
+openapi: 3.0.3
+info:
+  title: Subscription API
+  description: |
+    Сервис для агрегации подписок пользователей.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: dev-server
+
+tags:
+  - name: Subscriptions
+    description: Операции над подписками
+  - name: System
+    description: Проверка состояния сервиса
+
+paths:
+  /subscriptions:
+    post:
+      tags:
+        - Subscriptions
+      summary: Создать новую подписку
+      operationId: createSubscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionCreate'
+      responses:
+        '201':
+          description: Подписка успешно создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /subscriptions/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: ID подписки
+        schema:
+          type: integer
+          format: int64
+    get:
+      tags:
+        - Subscriptions
+      summary: Получить информацию о подписке
+      responses:
+        '200':
+          description: Данные подписки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+        - Subscriptions
+      summary: Обновить данные подписки
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionCreate'
+      responses:
+        '204':
+          description: Успешное обновление
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Subscriptions
+      summary: Удалить запись о подписке
+      responses:
+        '204':
+          description: Успешное удаление
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /subscriptions/list:
+    get:
+      tags:
+        - Subscriptions
+      summary: Список подписок пользователя
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: "60601fee-2bf1-4721-ae6f-7636e79a0cba"
+      responses:
+        '200':
+          description: Список найденных подписок
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Subscription'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /subscriptions/total-cost:
+    get:
+      tags:
+        - Subscriptions
+      summary: Подсчет суммарной стоимости подписок за период
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: service_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Фильтрация по названию сервиса
+        - name: period_start
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/SubscriptionDate'
+        - name: period_end
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/SubscriptionDate'
+      responses:
+        '200':
+          description: Суммарная стоимость в рублях
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_cost:
+                    type: integer
+                    format: int64
+                    example: 1200
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /liveness:
+    get:
+      tags:
+        - System
+      summary: Liveness probe
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /readiness:
+    get:
+      tags:
+        - System
+      summary: Readiness probe
+      responses:
+        '200':
+          description: Service is ready
+        '503':
+          description: Service is unavailable
+
+components:
+  schemas:
+    SubscriptionDate:
+      type: string
+      pattern: '^\d{2}-\d{4}$'
+      description: Дата в формате ММ-ГГГГ
+      example: "01-2020"
+
+    SubscriptionCreate:
+      type: object
+      required:
+        - service_name
+        - price
+        - user_id
+        - start_date
+      properties:
+        service_name:
+          type: string
+          example: "Yandex Plus"
+        price:
+          type: integer
+          description: Стоимость в рублях (целое число)
+          example: 400
+        user_id:
+          type: string
+          format: uuid
+          example: "60601fee-2bf1-4721-ae6f-7636e79a0cba"
+        start_date:
+          $ref: '#/components/schemas/SubscriptionDate'
+        end_date:
+          $ref: '#/components/schemas/SubscriptionDate'
+
+    Subscription:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: integer
+              format: int64
+              example: 1
+        - $ref: '#/components/schemas/SubscriptionCreate'
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Invalid request body"
+
+  responses:
+    BadRequest:
+      description: Ошибка в параметрах запроса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
