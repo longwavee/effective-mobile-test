@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/longwavee/effective-mobile-test/internal/model"
 )
 
@@ -18,6 +19,7 @@ type (
 		GetByID(ctx context.Context, id int64) (model.Subscription, error)
 		Update(ctx context.Context, sub *model.Subscription) error
 		Delete(ctx context.Context, id int64) error
+		ListByUserID(ctx context.Context, userID uuid.UUID) ([]model.Subscription, error)
 	}
 )
 
@@ -110,6 +112,24 @@ func (h *SubscriptionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.respond(w, http.StatusNoContent, nil)
+}
+
+func (h *SubscriptionHandler) ListByUserID(w http.ResponseWriter, r *http.Request) {
+	userIDStr := r.URL.Query().Get("user_id")
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		h.respondError(w, http.StatusBadRequest, "Invalid user id")
+		return
+	}
+
+	subs, err := h.service.ListByUserID(r.Context(), userID)
+	if err != nil {
+		h.handleServiceError(w, err)
+		return
+	}
+
+	h.respond(w, http.StatusOK, subs)
 }
 
 func (h *SubscriptionHandler) parseID(r *http.Request) (int64, error) {

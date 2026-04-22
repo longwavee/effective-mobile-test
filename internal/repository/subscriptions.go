@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/longwavee/effective-mobile-test/internal/config"
@@ -164,4 +165,41 @@ func (r *SubscriptionRepo) Remove(
 		return model.ErrSubscriptionNotFound
 	}
 	return nil
+}
+
+func (r *SubscriptionRepo) ListByUserID(
+	ctx context.Context,
+	userID uuid.UUID,
+) ([]model.Subscription, error) {
+	query := `
+		SELECT id, service_name, price, user_id, start_date, end_date
+		FROM subscriptions
+		WHERE user_id = $1
+	`
+	rows, err := r.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list subscriptions by user id failed: %w", err)
+	}
+	defer rows.Close()
+
+	subs := []model.Subscription{}
+	for rows.Next() {
+		var sub model.Subscription
+		if err := rows.Scan(
+			&sub.ID,
+			&sub.ServiceName,
+			&sub.Price,
+			&sub.UserID,
+			&sub.StartDate,
+			&sub.EndDate,
+		); err != nil {
+			return nil, fmt.Errorf("scan subscription failed: %w", err)
+		}
+		subs = append(subs, sub)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate subscriptions failed: %w", err)
+	}
+	return subs, nil
 }

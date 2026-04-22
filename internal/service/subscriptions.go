@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/longwavee/effective-mobile-test/internal/model"
 )
 
@@ -12,6 +13,7 @@ type (
 		FindByID(ctx context.Context, id int64) (model.Subscription, error)
 		Update(ctx context.Context, sub *model.Subscription) error
 		Remove(ctx context.Context, id int64) error
+		ListByUserID(ctx context.Context, userID uuid.UUID) ([]model.Subscription, error)
 	}
 )
 
@@ -59,6 +61,13 @@ func (s *SubscriptionService) Delete(
 	id int64,
 ) error {
 	return s.repo.Remove(ctx, id)
+}
+
+func (s *SubscriptionService) ListByUserID(
+	ctx context.Context,
+	userID uuid.UUID,
+) ([]model.Subscription, error) {
+	return s.repo.ListByUserID(ctx, userID)
 }
 
 func (s *SubscriptionService) validate(sub *model.Subscription) error {
