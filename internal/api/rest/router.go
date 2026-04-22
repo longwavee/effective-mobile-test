@@ -31,6 +31,7 @@ type (
 		Update(w http.ResponseWriter, r *http.Request)
 		Delete(w http.ResponseWriter, r *http.Request)
 		ListByUserID(w http.ResponseWriter, r *http.Request)
+		TotalCostForPeriod(w http.ResponseWriter, r *http.Request)
 	}
 )
 
@@ -60,6 +61,7 @@ func NewHTTPRouter(
 			r.Put("/{id}", subsHandler.Update)
 			r.Delete("/{id}", subsHandler.Delete)
 			r.Get("/list", subsHandler.ListByUserID)
+			r.Get("/total-cost", subsHandler.TotalCostForPeriod)
 		})
 	})
 

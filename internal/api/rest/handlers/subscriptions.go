@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -20,6 +21,7 @@ type (
 		Update(ctx context.Context, sub *model.Subscription) error
 		Delete(ctx context.Context, id int64) error
 		ListByUserID(ctx context.Context, userID uuid.UUID) ([]model.Subscription, error)
+		TotalCostForPeriod(ctx context.Context, userID uuid.UUID, serviceName string, periodStart, periodEnd time.Time) (int64, error)
 	}
 )
 
@@ -130,6 +132,39 @@ func (h *SubscriptionHandler) ListByUserID(w http.ResponseWriter, r *http.Reques
 	}
 
 	h.respond(w, http.StatusOK, subs)
+}
+
+func (h *SubscriptionHandler) TotalCostForPeriod(w http.ResponseWriter, r *http.Request) {
+	userID := r.URL.Query().Get("user_id")
+	serviceName := r.URL.Query().Get("service_name")
+	periodStart := r.URL.Query().Get("period_start")
+	periodEnd := r.URL.Query().Get("period_end")
+
+	p := SubscriptionRequest{
+		ServiceName: serviceName,
+		UserID:      userID,
+		StartDate:   periodStart,
+		EndDate:     &periodEnd,
+	}
+	s, err := p.ToModel() // just to validate params
+	if err != nil {
+		h.respondError(w, http.StatusBadRequest, "Invalid query parameters")
+		return
+	}
+
+	cost, err := h.service.TotalCostForPeriod(
+		r.Context(),
+		s.UserID,
+		s.ServiceName,
+		s.StartDate,
+		*s.EndDate,
+	)
+	if err != nil {
+		h.handleServiceError(w, err)
+		return
+	}
+
+	h.respond(w, http.StatusOK, map[string]int64{"total_cost": cost})
 }
 
 func (h *SubscriptionHandler) parseID(r *http.Request) (int64, error) {
