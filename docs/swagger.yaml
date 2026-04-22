@@ -1,33 +1,60 @@
 openapi: 3.0.3
 info:
   title: Subscription API
-  description: |
-    Сервис для агрегации подписок пользователей.
   version: 1.0.0
-
+  description: API для управления подписками пользователей на сервисы.
 servers:
-  - url: http://localhost:8080/api/v1
-    description: dev-server
+  - url: /api/v1
+    description: base (v1)
 
 tags:
+  - name: Health
+    description: Проверки состояния сервиса
   - name: Subscriptions
-    description: Операции над подписками
-  - name: System
-    description: Проверка состояния сервиса
+    description: Управление подписками пользователей
 
 paths:
+  /liveness:
+    get:
+      tags:
+        - Health
+      summary: Проверка доступности (Liveness probe)
+      responses:
+        '200':
+          description: Сервис работает
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /readiness:
+    get:
+      tags:
+        - Health
+      summary: Проверка готовности (Readiness probe)
+      responses:
+        '200':
+          description: Сервис готов принимать запросы
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
   /subscriptions:
     post:
       tags:
         - Subscriptions
       summary: Создать новую подписку
-      operationId: createSubscription
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SubscriptionCreate'
+              $ref: '#/components/schemas/SubscriptionRequest'
       responses:
         '201':
           description: Подписка успешно создана
@@ -38,7 +65,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '500':
-          $ref: '#/components/responses/InternalError'
+          $ref: '#/components/responses/InternalServerError'
 
   /subscriptions/{id}:
     parameters:
@@ -49,10 +76,11 @@ paths:
         schema:
           type: integer
           format: int64
+          example: 1
     get:
       tags:
         - Subscriptions
-      summary: Получить информацию о подписке
+      summary: Получить подписку по ID
       responses:
         '200':
           description: Данные подписки
@@ -60,8 +88,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Subscription'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       tags:
         - Subscriptions
@@ -71,40 +103,46 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SubscriptionCreate'
+              $ref: '#/components/schemas/SubscriptionRequest'
       responses:
         '204':
-          description: Успешное обновление
+          description: Подписка успешно обновлена
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     delete:
       tags:
         - Subscriptions
-      summary: Удалить запись о подписке
+      summary: Удалить подписку
       responses:
         '204':
-          description: Успешное удаление
+          description: Подписка успешно удалена
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /subscriptions/list:
     get:
       tags:
         - Subscriptions
-      summary: Список подписок пользователя
+      summary: Получить список подписок пользователя
       parameters:
         - name: user_id
           in: query
           required: true
+          description: UUID пользователя
           schema:
             type: string
             format: uuid
-          example: "60601fee-2bf1-4721-ae6f-7636e79a0cba"
       responses:
         '200':
-          description: Список найденных подписок
+          description: Список подписок
           content:
             application/json:
               schema:
@@ -113,38 +151,45 @@ paths:
                   $ref: '#/components/schemas/Subscription'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /subscriptions/total-cost:
     get:
       tags:
         - Subscriptions
-      summary: Подсчет суммарной стоимости подписок за период
+      summary: Рассчитать общую стоимость подписок за период
       parameters:
         - name: user_id
           in: query
           required: true
+          description: UUID пользователя
           schema:
             type: string
             format: uuid
-        - name: service_name
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Фильтрация по названию сервиса
         - name: period_start
           in: query
           required: true
+          description: Начало периода в формате MM-YYYY
           schema:
-            $ref: '#/components/schemas/SubscriptionDate'
+            type: string
+            example: "01-2023"
         - name: period_end
           in: query
           required: true
+          description: Конец периода в формате MM-YYYY
           schema:
-            $ref: '#/components/schemas/SubscriptionDate'
+            type: string
+            example: "12-2023"
+        - name: service_name
+          in: query
+          required: false
+          description: Фильтр по названию сервиса (опционально)
+          schema:
+            type: string
       responses:
         '200':
-          description: Суммарная стоимость в рублях
+          description: Общая стоимость рассчитана
           content:
             application/json:
               schema:
@@ -153,44 +198,16 @@ paths:
                   total_cost:
                     type: integer
                     format: int64
-                    example: 1200
+                    description: Сумма в рублях
+                    example: 5000
         '400':
           $ref: '#/components/responses/BadRequest'
-
-  /liveness:
-    get:
-      tags:
-        - System
-      summary: Liveness probe
-      responses:
-        '200':
-          description: OK
-          content:
-            text/plain:
-              schema:
-                type: string
-                example: OK
-
-  /readiness:
-    get:
-      tags:
-        - System
-      summary: Readiness probe
-      responses:
-        '200':
-          description: Service is ready
-        '503':
-          description: Service is unavailable
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
 components:
   schemas:
-    SubscriptionDate:
-      type: string
-      pattern: '^\d{2}-\d{4}$'
-      description: Дата в формате ММ-ГГГГ
-      example: "01-2020"
-
-    SubscriptionCreate:
+    SubscriptionRequest:
       type: object
       required:
         - service_name
@@ -198,42 +215,70 @@ components:
         - user_id
         - start_date
       properties:
+        id:
+          type: integer
+          format: int64
+          description: Может игнорироваться при создании, используется в маппинге
         service_name:
           type: string
           example: "Yandex Plus"
         price:
           type: integer
-          description: Стоимость в рублях (целое число)
-          example: 400
+          description: Стоимость в рублях
+          example: 299
         user_id:
           type: string
           format: uuid
-          example: "60601fee-2bf1-4721-ae6f-7636e79a0cba"
+          example: "123e4567-e89b-12d3-a456-426614174000"
         start_date:
-          $ref: '#/components/schemas/SubscriptionDate'
+          type: string
+          description: Дата начала подписки в формате MM-YYYY
+          example: "05-2023"
         end_date:
-          $ref: '#/components/schemas/SubscriptionDate'
+          type: string
+          description: Дата окончания подписки в формате MM-YYYY (опционально)
+          example: "05-2024"
+          nullable: true
 
     Subscription:
-      allOf:
-        - type: object
-          properties:
-            id:
-              type: integer
-              format: int64
-              example: 1
-        - $ref: '#/components/schemas/SubscriptionCreate'
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        service_name:
+          type: string
+          example: "Yandex Plus"
+        price:
+          type: integer
+          description: Стоимость в рублях
+          example: 299
+        user_id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        start_date:
+          type: string
+          format: date-time
+          description: Стандартный вывод time.Time в формате RFC3339
+          example: "2023-05-01T00:00:00Z"
+        end_date:
+          type: string
+          format: date-time
+          example: "2024-05-01T00:00:00Z"
+          nullable: true
 
     ErrorResponse:
       type: object
       properties:
         error:
           type: string
-          example: "Invalid request body"
+          example: "invalid request body"
 
   responses:
     BadRequest:
-      description: Ошибка в параметрах запроса
+      description: Неверный запрос (ошибка валидации данных или парсинга)
       content:
         application/json:
           schema:
@@ -244,8 +289,14 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-    InternalError:
+    InternalServerError:
       description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServiceUnavailable:
+      description: Сервис недоступен (например, база данных не отвечает)
       content:
         application/json:
           schema:

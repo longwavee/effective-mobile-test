@@ -12,6 +12,7 @@ import (
 	"github.com/longwavee/effective-mobile-test/internal/api/rest/handlers"
 	"github.com/longwavee/effective-mobile-test/internal/api/rest/middlewares"
 	"github.com/longwavee/effective-mobile-test/internal/config"
+	"github.com/longwavee/effective-mobile-test/internal/pkg/postgres"
 	"github.com/longwavee/effective-mobile-test/internal/repository"
 	"github.com/longwavee/effective-mobile-test/internal/service"
 )
@@ -23,6 +24,8 @@ type (
 
 		httpServer *rest.HTTPServer
 		httpRouter http.Handler
+
+		postgres *postgres.Client
 
 		healthHandler *handlers.HealthHandler
 		subsHandler   *handlers.SubscriptionHandler
@@ -66,11 +69,29 @@ func (c *DIContainer) HTTPRouter() http.Handler {
 	return c.httpRouter
 }
 
+func (c *DIContainer) Postgres() *postgres.Client {
+	if c.postgres == nil {
+		client, err := postgres.New(
+			context.TODO(),
+			c.cfg.Postgres.ConnString(),
+		)
+		if err != nil {
+			log.Println(fmt.Errorf("failed to init postgres: %w", err))
+			os.Exit(1)
+		}
+
+		c.postgres = client
+		c.log.Debug("postgres initialized")
+	}
+	return c.postgres
+}
+
 func (c *DIContainer) HealthHandler() *handlers.HealthHandler {
 	if c.healthHandler == nil {
 		c.healthHandler = handlers.NewHealthHandler(
 			&c.cfg.HTTPServer,
 			c.HealthService(),
+			c.log,
 		)
 		c.log.Debug("health handler initialized")
 	}
@@ -91,7 +112,7 @@ func (c *DIContainer) SubscriptionHandler() *handlers.SubscriptionHandler {
 func (c *DIContainer) HealthService() *service.HealthService {
 	if c.healthService == nil {
 		c.healthService = service.NewHealthService(
-			c.SubscriptionsRepo(),
+			c.Postgres(),
 		)
 		c.log.Debug("health service initialized")
 	}
@@ -110,17 +131,10 @@ func (c *DIContainer) SubscriptionService() *service.SubscriptionService {
 
 func (c *DIContainer) SubscriptionsRepo() *repository.SubscriptionRepo {
 	if c.subscriptionRepo == nil {
-		repo, err := repository.NewSubscriptionRepo(
-			context.TODO(),
-			&c.cfg.Postgres,
+		c.subscriptionRepo = repository.NewSubscriptionRepo(
+			c.Postgres().Pool,
 		)
-		if err != nil {
-			log.Println(fmt.Errorf("failed to init subscription repo: %w", err))
-			os.Exit(1)
-		}
-
-		c.subscriptionRepo = repo
-		c.log.Info("subscription repo initialized")
+		c.log.Debug("subscription repo initialized")
 	}
 	return c.subscriptionRepo
 }

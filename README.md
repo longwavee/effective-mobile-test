@@ -1,38 +1,48 @@
 # Subscription Aggregator Service
 
-REST service designed for aggregating and managing user subscription data.
+REST-сервис, предназначенный для агрегирования и управления данными о подписках пользователей.
+
+--
+
+## Структура проекта
+
+Проект использует чистую архитектуру для обеспечения разделения задач и удобства сопровождения:
+
+* **`cmd/app`**: Основная точка входа в приложение.
+
+* **`cmd/migrator`**: Утилита для выполнения миграций базы данных.
+
+* **`internal/api`**: Транспортный слой, содержащий обработчики HTTP и логику маршрутизации.
+
+* **`internal/service`**: Слой бизнес-логики (проверка, расчет стоимости подписки и т. д.).
+
+* **`internal/repository`**: Слой доступа к данным для взаимодействия с **PostgreSQL**.
+
+* **`internal/model`**: Основные доменные модели и сущности.
+
+* **`internal/config`**: Управление конфигурацией приложения.
+
+* **`internal/pkg`**: Внутренние библиотеки/инфраструктура.
+
+* **`docs`**: Документация API (схемы Swagger/OpenAPI).
+
+* **`миграции`**: SQL-скрипты для версионирования схемы базы данных.
 
 ---
 
-## 🏗 Project Structure
+## Быстрый старт
 
-The project follows a clean architecture pattern to ensure separation of concerns and maintainability:
+Выполните следующие шаги, чтобы запустить сервис в вашей локальной среде:
 
-* **`cmd/app`**: Main entry point of the application.
-* **`cmd/migrator`**: Utility for executing database migrations.
-* **`internal/api`**: Transport layer containing HTTP handlers and routing logic.
-* **`internal/service`**: Business logic layer (validation, subscription cost calculation, etc.).
-* **`internal/repository`**: Data access layer for interaction with **PostgreSQL**.
-* **`internal/model`**: Core domain models and entities.
-* **`internal/config`**: Application configuration management.
-* **`docs`**: API documentation (Swagger/OpenAPI schemes).
-* **`migrations`**: SQL scripts for database schema versioning.
-
----
-
-## 🚀 Quick Start
-
-Follow these steps to get the service up and running in your local environment:
-
-### 1. Environment Configuration
-Create a `.env` file in the root directory. You can use the provided template as a starting point:
+### 1. Настройка среды
+Создайте файл `.env` в корневом каталоге. Вы можете использовать предоставленный шаблон в качестве старта:
 ```bash
 cp .env.example .env
 ```
 
-### 2. Launch with Docker
+### 2. Запуск с помощью Docker
 
-Build and start all services (App, Database) using Docker Compose:
+Соберите и запустите все сервисы (приложение, база данных) с помощью Docker Compose:
 
 ```bash
 docker-compose up --build

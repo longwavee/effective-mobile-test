@@ -36,14 +36,14 @@ func New() (*App, error) {
 }
 
 func (a *App) Start() error {
-	err := a.di.SubscriptionsRepo().Check(context.Background())
+	err := a.di.Postgres().Check(context.Background())
 	if err != nil {
-		return fmt.Errorf("check subscription repo failed: %w", err)
+		return fmt.Errorf("app: postgres check: %w", err)
 	}
 
 	err = a.di.HTTPServer().Start()
 	if err != nil {
-		return fmt.Errorf("start http server failed: %w", err)
+		return fmt.Errorf("app: failed start http server: %w", err)
 	}
 	a.log.Info("http server started", "port", a.cfg.HTTPServer.Port)
 
@@ -58,10 +58,9 @@ func (a *App) GracefullStop() error {
 	if err != nil {
 		return fmt.Errorf("stop http server failed: %w", err)
 	}
-	a.log.Info("http server stopped", "port", a.cfg.HTTPServer.Port)
+	a.log.Info("http server stopped")
 
-	a.di.SubscriptionsRepo().Close()
-	a.log.Info("subscriptions repo closed")
+	a.di.Postgres().Close()
 
 	a.log.Info("app gracefully stopped")
 	return nil

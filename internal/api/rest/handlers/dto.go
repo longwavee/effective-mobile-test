@@ -7,7 +7,9 @@ import (
 	"github.com/longwavee/effective-mobile-test/internal/model"
 )
 
-const subscriptionRequestDateFormat = "01-2006"
+const (
+	subscriptionDateFormat = "01-2006"
+)
 
 type (
 	SubscriptionRequest struct {
@@ -21,31 +23,31 @@ type (
 )
 
 func (r *SubscriptionRequest) ToModel() (*model.Subscription, error) {
-	userID, err := uuid.Parse(r.UserID)
+	uid, err := uuid.Parse(r.UserID)
 	if err != nil {
 		return nil, err
 	}
 
-	startDate, err := time.Parse(subscriptionRequestDateFormat, r.StartDate)
+	start, err := time.Parse(subscriptionDateFormat, r.StartDate)
 	if err != nil {
 		return nil, err
 	}
 
-	var endDate *time.Time
-	if r.EndDate != nil {
-		newEndDate, err := time.Parse(subscriptionRequestDateFormat, *r.EndDate)
+	var end *time.Time
+	if r.EndDate != nil && *r.EndDate != "" {
+		t, err := time.Parse(subscriptionDateFormat, *r.EndDate)
 		if err != nil {
 			return nil, err
 		}
-		endDate = &newEndDate
+		end = &t
 	}
 
 	return &model.Subscription{
 		ID:          r.ID,
 		ServiceName: r.ServiceName,
 		Price:       r.Price,
-		UserID:      userID,
-		StartDate:   startDate,
-		EndDate:     endDate,
+		UserID:      uid,
+		StartDate:   start,
+		EndDate:     end,
 	}, nil
 }

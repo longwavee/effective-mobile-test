@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -16,13 +17,15 @@ type (
 
 type (
 	HealthHandler struct {
+		baseHandler
 		provider         HealthProvider
 		readinessTimeout time.Duration
 	}
 )
 
-func NewHealthHandler(cfg *config.HTTPServer, provider HealthProvider) *HealthHandler {
+func NewHealthHandler(cfg *config.HTTPServer, provider HealthProvider, log *slog.Logger) *HealthHandler {
 	return &HealthHandler{
+		baseHandler:      baseHandler{log: log},
 		provider:         provider,
 		readinessTimeout: cfg.ReadinessTimeout,
 	}
@@ -44,11 +47,8 @@ func (h *HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 	err := h.provider.Check(ctx)
 
 	if err != nil {
-		// TODO: add a normal writer
-		w.WriteHeader(http.StatusServiceUnavailable)
-		_, _ = w.Write([]byte("Service unavailable"))
+		h.respondError(w, http.StatusServiceUnavailable, "service unavailable")
 	} else {
-		// TODO: add a normal writer
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("OK"))
 	}

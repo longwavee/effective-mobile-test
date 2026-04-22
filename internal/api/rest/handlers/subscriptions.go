@@ -27,25 +27,28 @@ type (
 
 type (
 	SubscriptionHandler struct {
+		baseHandler
 		service SubscriptionService
-		log     *slog.Logger
 	}
 )
 
 func NewSubscriptionHandler(service SubscriptionService, log *slog.Logger) *SubscriptionHandler {
-	return &SubscriptionHandler{service: service, log: log}
+	return &SubscriptionHandler{
+		baseHandler: baseHandler{log: log},
+		service:     service,
+	}
 }
 
 func (h *SubscriptionHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var subReq SubscriptionRequest
-	if err := json.NewDecoder(r.Body).Decode(&subReq); err != nil {
-		h.respondError(w, http.StatusBadRequest, "Invalid request body")
+	var req SubscriptionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	sub, err := subReq.ToModel()
+	sub, err := req.ToModel()
 	if err != nil {
-		h.respondError(w, http.StatusBadRequest, "Invalid request body")
+		h.respondError(w, http.StatusBadRequest, "invalid data format")
 		return
 	}
 
@@ -80,16 +83,16 @@ func (h *SubscriptionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var subReq SubscriptionRequest
-	if err := json.NewDecoder(r.Body).Decode(&subReq); err != nil {
-		h.respondError(w, http.StatusBadRequest, "Invalid request body")
+	var req SubscriptionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	subReq.ID = id
+	req.ID = id
 
-	sub, err := subReq.ToModel()
+	sub, err := req.ToModel()
 	if err != nil {
-		h.respondError(w, http.StatusBadRequest, "Invalid request body")
+		h.respondError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
@@ -121,7 +124,7 @@ func (h *SubscriptionHandler) ListByUserID(w http.ResponseWriter, r *http.Reques
 
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		h.respondError(w, http.StatusBadRequest, "Invalid user id")
+		h.respondError(w, http.StatusBadRequest, "invalid user_id")
 		return
 	}
 
@@ -135,29 +138,32 @@ func (h *SubscriptionHandler) ListByUserID(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *SubscriptionHandler) TotalCostForPeriod(w http.ResponseWriter, r *http.Request) {
-	userID := r.URL.Query().Get("user_id")
-	serviceName := r.URL.Query().Get("service_name")
-	periodStart := r.URL.Query().Get("period_start")
-	periodEnd := r.URL.Query().Get("period_end")
+	q := r.URL.Query()
 
-	p := SubscriptionRequest{
-		ServiceName: serviceName,
-		UserID:      userID,
-		StartDate:   periodStart,
-		EndDate:     &periodEnd,
-	}
-	s, err := p.ToModel() // just to validate params
+	userID, err := uuid.Parse(q.Get("user_id"))
 	if err != nil {
-		h.respondError(w, http.StatusBadRequest, "Invalid query parameters")
+		h.respondError(w, http.StatusBadRequest, "invalid user_id")
+		return
+	}
+
+	start, err := time.Parse(subscriptionDateFormat, q.Get("period_start"))
+	if err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid period_start")
+		return
+	}
+
+	end, err := time.Parse(subscriptionDateFormat, q.Get("period_end"))
+	if err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid period_end")
 		return
 	}
 
 	cost, err := h.service.TotalCostForPeriod(
 		r.Context(),
-		s.UserID,
-		s.ServiceName,
-		s.StartDate,
-		*s.EndDate,
+		userID,
+		q.Get("service_name"),
+		start,
+		end,
 	)
 	if err != nil {
 		h.handleServiceError(w, err)
@@ -167,38 +173,25 @@ func (h *SubscriptionHandler) TotalCostForPeriod(w http.ResponseWriter, r *http.
 	h.respond(w, http.StatusOK, map[string]int64{"total_cost": cost})
 }
 
+func (h *SubscriptionHandler) handleServiceError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, model.ErrSubscriptionNotFound):
+		h.respondError(w, http.StatusNotFound, model.ErrSubscriptionNotFound.Error())
+	case errors.Is(err, model.ErrSubscriptionEmptyService):
+		h.respondError(w, http.StatusBadRequest, model.ErrSubscriptionEmptyService.Error())
+	case errors.Is(err, model.ErrSubscriptionInvalidPeriod):
+		h.respondError(w, http.StatusBadRequest, model.ErrSubscriptionInvalidPeriod.Error())
+	default:
+		h.log.Error("internal error", "err", err)
+		h.respondError(w, http.StatusInternalServerError, "internal server error")
+	}
+}
+
 func (h *SubscriptionHandler) parseID(r *http.Request) (int64, error) {
-	idStr := chi.URLParam(r, "id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	param := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(param, 10, 64)
 	if err != nil || id <= 0 {
 		return 0, errors.New("invalid resource identity")
 	}
 	return id, nil
-}
-
-func (h *SubscriptionHandler) respond(w http.ResponseWriter, code int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	if data != nil {
-		_ = json.NewEncoder(w).Encode(data)
-	}
-}
-
-func (h *SubscriptionHandler) respondError(w http.ResponseWriter, code int, msg string) {
-	h.respond(w, code, map[string]string{"error": msg})
-}
-
-func (h *SubscriptionHandler) handleServiceError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, model.ErrSubscriptionNotFound):
-		h.respondError(w, http.StatusNotFound, "Subscription not found")
-	case errors.Is(err, model.ErrSubscriptionEmptyService):
-		h.respondError(w, http.StatusBadRequest, "Service name is empty")
-	case errors.Is(err, model.ErrSubscriptionInvalidPeriod):
-		h.respondError(w, http.StatusBadRequest, "Invalid period")
-
-	default:
-		h.log.Error("service error", "error", err)
-		h.respondError(w, http.StatusInternalServerError, "Internal server error")
-	}
 }
